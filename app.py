@@ -3,13 +3,17 @@ import cores
 
 pygame.init()
 
+pygame.mixer.music.load("musicas/musica_de_fundo.mp3")
+pygame.mixer.music.set_volume(0.2)  # Ajuste o volume conforme necessário
+pygame.mixer.music.play(-1)
+
 # CONFIGS GERAIS
 screen = pygame.display.set_mode((1280, 720))
 pygame.display.set_caption('Batalha Naval')
 
 # FONTES
-fonte = pygame.font.Font('batalha_naval_pygame/fonts/CHEDROS Regular.ttf', 72)
-fonte2 = pygame.font.Font('batalha_naval_pygame/fonts/CHEDROS Regular.ttf', 18)
+fonte = pygame.font.Font('fonts/CHEDROS Regular.ttf', 72)
+fonte2 = pygame.font.Font('fonts/CHEDROS Regular.ttf', 18)
 
 # TEXTOS E BOTÕES DO MENU
 texto1 = fonte.render('COMEÇAR', True, (255, 255, 255))
@@ -29,7 +33,7 @@ rect_texto3 = texto3.get_rect(topleft=(770, 700))
 texto1_pos = texto1.get_rect(center=rect_texto1.center)
 texto2_pos = texto2.get_rect(center=rect_texto2.center)
 
-img = pygame.image.load('batalha_naval_pygame/images/capa.jpg').convert_alpha()
+img = pygame.image.load('images/capa.jpg').convert_alpha()
 img = pygame.transform.scale(img, (1280, 720))
 
 cor_fundo_botao = (100, 50, 16)
@@ -70,9 +74,19 @@ while menu_ativo:
     pygame.display.update()
 
 # =================== JOGO COMEÇA AQUI =====================
-
-background = pygame.image.load(r'C:\Users\joaov\OneDrive\Área de Trabalho\programação\pygame\batalha_naval_pygame\background.jpg')  
+background = pygame.image.load("images/background.jpg") 
 background = pygame.transform.scale(background, (1280, 720))
+
+cellsize = 50
+
+screen = pygame.display.set_mode((1280, 720))
+pygame.display.set_caption('Batalha Naval')
+
+imagem_explosao = pygame.image.load("images/explosão.png")
+imagem_explosao = pygame.transform.scale(imagem_explosao, (cellsize, cellsize))
+explosao_sound = pygame.mixer.Sound("musicas/explosao.mp3")
+explosao_sound.set_volume(0.05)
+
 
 def CreateGameGrid(rows, cols, cellsize, pos):
     startx = pos [0]
@@ -91,7 +105,7 @@ def CreateGameGrid(rows, cols, cellsize, pos):
 def updategamelogic(rows, cols):
     return [[' ' for _ in range(cols)] for _ in range(rows)]
 
-def showgrid(window, cellsize, player1grid, player2grid, pgamelogic,p2gamelogic):
+def showgrid(window, cellsize, player1grid, player2grid, pgamelogic, p2gamelogic, rows, cols):
     
     window.blit(background,(0,0))
     
@@ -118,14 +132,25 @@ def showgrid(window, cellsize, player1grid, player2grid, pgamelogic,p2gamelogic)
     
     for row in range(rows):
         for col in range(cols):
-            if pgamelogic[row][col] == 'S':
+            if pgamelogic[row][col] == 'S': 
                 x, y = player1grid[row][col]
                 pygame.draw.rect(window, cores.Azul, (x, y, cellsize, cellsize))
-            
+
+    for row in range(rows):
+        for col in range(cols):
             if p2gamelogic[row][col] == 'S':
                 x, y = player2grid[row][col]
                 pygame.draw.rect(window, cores.Verde, (x, y, cellsize, cellsize))
+    
+    for row in range(rows):
+        for col in range(cols):
+            if pgamelogic[row][col] == 'X':
+                x, y = player1grid[row][col]
+                window.blit(imagem_explosao, (x, y)) 
 
+            if p2gamelogic[row][col] == 'X':
+                x, y = player2grid[row][col]
+                window.blit(imagem_explosao, (x, y))
     
     for grid in [player1grid, player2grid]:
         for row in grid:
@@ -150,62 +175,59 @@ def draw_chat(window, message, player):
     text_surface = font.render(chat_message, True, cores.Preto)
     window.blit(text_surface, (chat_rect.x + 10, chat_rect.y + 5))
 
+orientation = "H"
+
 def place_ship(grid, logic, ship_name, ship_size, player):
+    global orientation
     print(f'Jogador {player}, posicione o {ship_name} (tamanho {ship_size}).')
-    selected_cells = []
-    
-    while len(selected_cells) < ship_size:
+
+    while True:
         screen.fill(cores.AzulTurquesa)
-        showgrid(screen, cellsize, pgamegrid, p2gamegrid, pgamelogic, p2gamelogic)
-        draw_chat(screen, f'Posicione o {ship_name} (tamanho {ship_size}) - Selecione {ship_size} ', player)
+        showgrid(screen, cellsize, pgamegrid, p2gamegrid, pgamelogic, p2gamelogic, rows, cols)
+        draw_chat(screen, f"[{orientation}] Posicione o {ship_name} (tamanho {ship_size})", player)
+
         pygame.display.update()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 return
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    orientation = 'V' if orientation == 'H' else 'H'
+                    print(f"Orientação agora: {orientation}") 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse = pygame.mouse.get_pos()
+
                 for rowidx, row in enumerate(grid):
                     for colidx, (x, y) in enumerate(row):
                         if x <= mouse[0] <= x + cellsize and y <= mouse[1] <= y + cellsize:
-                            if logic[rowidx][colidx] == ' ':
-                                if not selected_cells:
-                                    selected_cells.append((rowidx, colidx))
-                                    logic[rowidx][colidx] = 'S'
-                                else:
-                                    last_row, last_col = selected_cells[-1]
-                                    same_row = rowidx == last_row and abs(colidx - last_col) == 1
-                                    same_col = colidx == last_col and abs(rowidx - last_row) == 1
-                                    
-                                    if (same_row or same_col) and len(selected_cells) < ship_size:
-                                        selected_cells.append((rowidx, colidx))
-                                        logic[rowidx][colidx] = 'S'
+                            selected_cells = []
+                            valid = True
+
+                            for i in range(ship_size):
+                                r = rowidx + i if orientation == 'V' else rowidx
+                                c = colidx + i if orientation == 'H' else colidx
+
+                                if r >= rows or c >= cols or logic[r][c] != ' ':
+                                    valid = False
+                                    break
+                                selected_cells.append((r, c))
+
+                            if valid:
+                                for r, c in selected_cells:
+                                    logic[r][c] = 'S'
+                                    if player == 1:
+                                        ship_types_p1[r][c] = ship_name
                                     else:
-                                        draw_chat(screen, "Selecione células adjacentes em linha reta!", player)
-                                        pygame.display.update()
-                                        pygame.time.wait(1000)
+                                        ship_types_p2[r][c] = ship_name
+
+                                return
                             else:
-                                draw_chat(screen, "Célula já ocupada!", player)
+                                draw_chat(screen, "Posição inválida! Fora da grade ou sobreposição.", player)
                                 pygame.display.update()
                                 pygame.time.wait(1000)
                             break
-
-        if len(selected_cells) == ship_size:
-            rows = [cell[0] for cell in selected_cells]
-            cols = [cell[1] for cell in selected_cells]
-
-
-            if not (all(r == rows[0] for r in rows) or all(c == cols[0] for c in cols)):
-                draw_chat(screen, "Navio deve ser em linha reta horizontal ou vertical!", player)
-                pygame.display.update()
-                pygame.time.wait(1500)
-
-                for row, col in selected_cells:
-                    logic[row][col] = ' '
-                selected_cells = []
-
-
 def validate_manual_placement(cells):
    
     rows = [cell[0] for cell in cells]
@@ -216,17 +238,45 @@ def validate_manual_placement(cells):
         return sorted(rows) == list(range(min(rows), max(rows) + 1))
     return False
 
+def check_victory(player_logic):
+
+    for row in player_logic:
+        for cell in row:
+            if cell == 'S':
+                return False
+    return True
+
+def show_victory_screen(window, player):
+
+    window.fill((0, 0, 0))
+    pygame.display.update()
+
+    font = pygame.font.SysFont("Arial", 80, bold=True)
+    text = font.render(f"JOGADOR {player} VENCEU!", True, (255, 215, 0))
+    text_rect = text.get_rect(center=(window.get_width() // 2, window.get_height() // 2))
+
+    for alpha in range(0, 256, 5):
+        window.fill((0, 0, 0))
+        text.set_alpha(alpha)
+        window.blit(text, text_rect)
+        pygame.display.update()
+        pygame.time.delay(20)
+
+    pygame.time.wait(3000)
 
 ships = {"Porta-aviões": 5,"Couraçado": 4,"Cruzador": 3,"Submarino": 3,"Destroyer": 2}
 cols= 10
 rows = 10
 cellsize = 50
 
-screen = pygame.display.set_mode((1280, 720))
+pgamelogic = updategamelogic(rows, cols)
+ship_types_p1 = updategamelogic(rows, cols)
 
-pgamegrid = CreateGameGrid(rows, cols, cellsize, (60, 70))
+p2gamelogic = updategamelogic(rows, cols)
+ship_types_p2 = updategamelogic(rows, cols)
 pgamelogic = updategamelogic(rows, cols)
 
+pgamegrid = CreateGameGrid(rows, cols, cellsize, (60, 70))
 p2gamegrid = CreateGameGrid(rows, cols, cellsize, (1280 - (rows * cellsize) - 60, 70))
 p2gamelogic = updategamelogic(rows, cols)
 
@@ -235,32 +285,63 @@ printgamelogic(pgamelogic, p2gamelogic)
 for player, (grid, logic) in enumerate([(pgamegrid, pgamelogic), (p2gamegrid, p2gamelogic)], start=1):
     for ship_name, ship_size in ships.items():
         place_ship(grid, logic, ship_name, ship_size, player)
-        showgrid(screen, cellsize, pgamegrid, p2gamegrid,pgamelogic,p2gamelogic)
+        showgrid(screen, cellsize, pgamegrid, p2gamegrid,pgamelogic,p2gamelogic, rows, cols)
         pygame.display.update()
 
-
+message = "Clique para Atirar!"
+current_player = 1
 
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
- 
-    showgrid(screen, cellsize, pgamegrid, p2gamegrid,p2gamelogic,pgamelogic)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse = pygame.mouse.get_pos()
 
-for rowidx, row in enumerate(pgamegrid):
-            for colidx, (x, y) in enumerate(row):
-                if pgamelogic[rowidx][colidx] == 'X':
-                    pygame.draw.line(screen, cores.Vermelho, (x, y), (x + cellsize, y + cellsize), 3)
-                    pygame.draw.line(screen, cores.Vermelho, (x + cellsize, y), (x, y + cellsize), 3)
+            if current_player == 1:
+                target_grid = p2gamegrid  
+                target_logic = p2gamelogic
+                player_grid = pgamegrid 
+            
+            else:
+                target_grid = pgamegrid 
+                target_logic = pgamelogic
+                player_grid = p2gamegrid 
+    
+            for rowidx, row in enumerate(target_grid):
+                for colidx, (x, y) in enumerate(row):
+                    if x <= mouse[0] <= x + cellsize and y <= mouse[1] <= y + cellsize:
+                        if target_logic[rowidx][colidx] == 'S':
+                            target_logic[rowidx][colidx] = 'X'
+                            explosao_sound.play()
+                            draw_chat(screen, f"Jogador {current_player} acertou!", current_player)
+                        elif target_logic[rowidx][colidx] == ' ': 
+                            target_logic[rowidx][colidx] = 'A'
+                            explosao_sound.play()
+                            draw_chat(screen, f"Jogador {current_player} errou. Troca de jogador!", current_player)
+                            current_player = 2 if current_player == 1 else 1 
 
-for rowidx, row in enumerate(p2gamegrid):
-    for colidx, (x, y) in enumerate(row):
-            if p2gamelogic[rowidx][colidx] == 'X':
-                pygame.draw.line(screen, cores.Vermelho, (x, y), (x + cellsize, y + cellsize), 3)
-                pygame.draw.line(screen, cores.Vermelho, (x + cellsize, y), (x, y + cellsize), 3)
+                        pygame.display.update()  
+                        pygame.time.wait(200)  
+                        break 
+
+        showgrid(screen, cellsize, pgamegrid, p2gamegrid, pgamelogic, p2gamelogic, rows, cols)
+
+    if check_victory(pgamelogic):
+        show_victory_screen(screen, 1)
+        break 
+    elif check_victory(p2gamelogic):
+        show_victory_screen(screen, 2)
+        break 
+
+    font = pygame.font.SysFont(None, 27)
+    display_message = f"É a vez do Jogador {current_player}. {message}"
+    chat_rect = pygame.Rect(50, 650, 1180, 37)
+    pygame.draw.rect(screen, cores.Prata, chat_rect)
+    text_surface = font.render(display_message, True, cores.Preto)
+    screen.blit(text_surface, (chat_rect.x + 10, chat_rect.y + 5))
 
     pygame.display.update()
-    
 
 pygame.quit()
